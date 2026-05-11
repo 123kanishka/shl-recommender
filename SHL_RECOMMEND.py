@@ -24,12 +24,14 @@ STOP_WORDS = {
     "a", "an", "and", "are", "around", "as", "assessment", "assessments",
     "be", "for", "from", "hiring", "i", "in", "is", "it", "need", "of",
     "on", "or", "our", "please", "role", "test", "tests", "that", "the",
-    "their", "to", "want", "we", "who", "with",
+    "their", "to", "want", "we", "who", "with", "can", "you", "help",
+    "me", "pick", "choose", "select",
 }
 
 GENERIC_QUERY_WORDS = {
     "assessment", "assessments", "test", "tests", "hire", "hiring",
     "candidate", "candidates", "employee", "employees", "screening",
+    "help", "pick", "choose", "select",
 }
 
 TECH_TERMS = {
@@ -437,6 +439,9 @@ class ConversationAgent:
         return any(marker in lower for marker in completion_markers)
 
     def _needs_clarification(self, query_context: str) -> bool:
+        if not self._has_role_or_skill_signal(query_context):
+            return True
+
         tokens = set(tokenize(query_context))
         meaningful_tokens = tokens - GENERIC_QUERY_WORDS
         if len(meaningful_tokens) < 2:
@@ -444,6 +449,17 @@ class ConversationAgent:
 
         top_score = self.search.search(query_context, 1)
         return not top_score or top_score[0].score < 0.08
+
+    def _has_role_or_skill_signal(self, query_context: str) -> bool:
+        lower = query_context.lower()
+        signal_patterns = [
+            r"\b(java|python|sql|spring|aws|docker|excel|word|sales|finance|financial|healthcare|hipaa|medical)\b",
+            r"\b(contact|center|centre|customer|service|admin|assistant|graduate|trainee|leadership|executive)\b",
+            r"\b(safety|dependability|personality|cognitive|numerical|situational|reasoning|coding)\b",
+            r"\b(engineer|developer|analyst|operator|agent|manager|director|cxo)\b",
+            r"\bjob description\b|\bjd\b",
+        ]
+        return any(re.search(pattern, lower) for pattern in signal_patterns)
 
     def _is_out_of_scope_or_injection(self, latest_text: str, full_text: str) -> bool:
         latest_lower = latest_text.lower()
@@ -454,7 +470,7 @@ class ConversationAgent:
         ]
         off_topic = [
             "legal advice", "legally required", "legal requirement", "employment law",
-            "write a contract", "salary negotiation", "interview questions",
+            "write a contract", "legal hiring policy", "write a legal", "salary negotiation", "interview questions",
             "hiring plan", "performance improvement plan", "satisfy that requirement",
             "weather", "stock price", "medical advice", "recipe",
         ]
